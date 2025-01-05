@@ -28,3 +28,10 @@ class Task(TaskBase):
     class Config:
         from_attributes = True
 
+class TaskStatusCount(BaseModel):
+    pending_count: int
+    in_progress_count: int
+    completed_count: int
+
+    class Config:
+        orm_mode = True
