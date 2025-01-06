@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.database import database
 from app.schemas import user_task
 from app.services import user_service
-from app.services.task_service import create_task,get_tasks_by_reference_id,get_id_to_delete,get_id_to_update
+from app.services.task_service import create_task,get_tasks_by_reference_id,get_id_to_delete,get_id_to_update,task_count_of_user
 from app.routes.route_auth import decode_jwt,oauth2_scheme
 
 # from app.services.auth import get_current_user
@@ -50,6 +50,21 @@ async def get_task(
     tasks_to_get= get_tasks_by_reference_id (db,reference_id,skip,limit)
     return tasks_to_get
 
+@router.get("/task_count/{task_id}", response_model=user_task.TaskStatusCount)
+async def get_task_count(
+    db: Session = Depends(database.get_db),
+    token: str = Depends(oauth2_scheme)
+
+):
+    user_info = decode_jwt(token)
+    reference_id = user_info["sub"] 
+
+    task_counts = task_count_of_user(db, reference_id)
+    return user_task.TaskStatusCount(
+        pending_count=task_counts['Pending'],
+        in_progress_count=task_counts['In Progress'],
+        completed_count=task_counts['Completed']
+    )
    
 @router.put("/tasks/{task_id}", response_model=user_task.Task)
 async def update_task(

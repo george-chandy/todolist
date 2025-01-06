@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 # from models import user_task_models
 # from schemas import user_task
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 from app.models.user_task_models import Tasks
 from app.schemas import user_task
@@ -42,7 +43,26 @@ def get_id_to_delete(session: Session, task_id: int):
     return task
 
 
-
+def task_count_of_user (db: Session, reference_id: int):
+    result = (
+        db.query(
+            case([(Tasks.status == 'Pending', 'Pending')], else_='').label('status'),
+            func.count(case([(Tasks.status == 'Pending', 1)], else_=None)).label('count')
+        )
+        .filter(Tasks.reference_id == reference_id)  # Filter by the specific user_id
+        .group_by('status')  # Group by status (Pending, In Progress, Completed)
+        .all()  # Get all results
+    )
+    
+    # Convert the result into a dictionary with status as the key and count as the value
+    task_counts = {row.status: row.count for row in result}
+    
+    # Provide a default value of 0 for statuses that don't exist in the result
+    task_counts.setdefault('Pending', 0)
+    task_counts.setdefault('In Progress', 0)
+    task_counts.setdefault('Completed', 0)
+    
+    return task_counts
 
 
 
