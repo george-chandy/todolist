@@ -9,6 +9,12 @@ from app.schemas import user_schema
 from auth0.authentication.token_verifier import TokenVerifier, AsymmetricSignatureVerifier
 
 
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from uuid import uuid4
+from app.schemas import user_schema  # Assuming user schema is defined
+from app.database.database  import SessionLocal # Assuming your DB session is configured
+
 authrouter = APIRouter(
     tags=["auth"],
 )
@@ -62,25 +68,106 @@ def decode_jwt(token: str):
         )
 
 
-@router.post("/register")
-async def register(user:user_schema.UserCreate):
+# @router.post("/register")
+# async def register(user:user_schema.UserCreate):
 
-    database = Database(AUTH0_DOMAIN, AUTH0_CLIENT_ID)
-    #database.signup(email='s', password='secr@bqqAs83t', connection='Username-Password-Authentication')
-    try:
-        new_user=database.signup(
-            connection= 'Username-Password-Authentication',  
-            username= user.username, 
-            password= user.password,
-            email=user.email
+#     database = Database(AUTH0_DOMAIN, AUTH0_CLIENT_ID)
+#     #database.signup(email='s', password='secr@bqqAs83t', connection='Username-Password-Authentication')
+#     try:
+#         new_user=database.signup(
+#             connection= 'Username-Password-Authentication',  
+#             username= user.username, 
+#             password= user.password,
+#             email=user.email
     
-        )
+#         )
 
+#     except Exception as ex:
+#         print(ex)
+#         raise HTTPException (status_code=400,detail=str(ex))
+#     print(new_user)
+#     return user_schema.User(user_id=new_user["_id"],username=user.username,email=user.email)
+
+
+router = APIRouter()
+
+
+@router.post("/register")
+async def register(user: user_schema.UserCreate):
+    # Initialize the Auth0 Database client
+    database = Database(AUTH0_DOMAIN, AUTH0_CLIENT_ID)
+
+    # Register user in Auth0
+    try:
+        new_user = database.signup(
+            connection="Username-Password-Authentication",
+            username=user.username,
+            password=user.password,
+            email=user.email
+        )
     except Exception as ex:
         print(ex)
-        raise HTTPException (status_code=400,detail=str(ex))
-    print(new_user)
-    return user_schema.User(user_id=new_user["_id"],username=user.username,email=user.email)
+        raise HTTPException(status_code=400, detail=f"Auth0 Registration Error: {str(ex)}")
+
+    # Generate a UUID token for the user
+    token = str(uuid4())
+    schema_name = f"user_{token}"
+    
+
+    # Save user details in your database and create schema
+    async with SessionLocal() as session:
+        # Check if the user already exists locally
+        result = await session.execute(
+            text("SELECT 1 FROM public.users WHERE reference_id = :id"),
+            {"id": new_user["_id"]}
+        )
+        if result.fetchone():
+            raise HTTPException(status_code=400, detail="User already exists in the database.")
+
+        # Insert user metadata into the public.users table
+        await session.execute(
+            text("""
+                INSERT INTO public.users (reference_id, name, email, uuid)
+                VALUES (:reference_id, :name, :email, :uuid)
+            """),
+            {
+                "reference_id": new_user["_id"],
+                "name": user.username,
+                "email": user.email,
+                "uuid": token,
+            }
+        )
+
+        # Create the user's schema
+        await session.execute(text(f'CREATE SCHEMA "{schema_name}"'))
+
+        # Create the tasks table in the new schema
+        await session.execute(
+            text(f"""
+                CREATE TABLE "{schema_name}".tasks (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    description TEXT NOT NULL,
+                    completed BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT NOW(),
+                    updated_at TIMESTAMP DEFAULT NOW()
+                )
+            """)
+        )
+
+        # Commit the transaction
+        await session.commit()
+
+    # Return the user data along with the token
+    return {
+        "user_id": new_user["_id"],
+        "username": user.username,
+        "email": user.email,
+        "token": token,
+        "message": "User registered successfully!"
+    }
+
+
+
 
 
 @router.post("/login")

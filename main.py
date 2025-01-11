@@ -1,12 +1,14 @@
 import os
 from fastapi import FastAPI
-from app.routes.route_user import router as user_router 
+# from app.routes.route_user import router as user_router 
 from app.routes.route_tasks import router as task_router
 from app.routes.route_auth import router as auth_router
 # from app.database.database import create_all_tables
+import uvicorn
+
 app = FastAPI()
 
-app.include_router(user_router, prefix="/users", tags=["users"])
+# app.include_router(user_router, prefix="/users", tags=["users"])
 app.include_router(task_router, prefix="/tasks", tags=["tasks"])
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
@@ -23,7 +25,7 @@ async def root():
 
 
 if __name__ == "__main__":
-    import uvicorn
+  
     
     uvicorn.run(app, host="127.0.0.1", port=8000)
 

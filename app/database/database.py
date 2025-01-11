@@ -2,13 +2,15 @@
 from sqlalchemy import Table, create_engine, Column, Integer, String, MetaData
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm import declarative_base
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 
 
-SQLALCHEMY_DATABASE_URL = "postgresql://sanjana:5454@localhost:5431/todolist"
+SQLALCHEMY_DATABASE_URL = "postgresql+asyncpg://sanjana:5454@localhost:5431/todolist"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_async_engine(SQLALCHEMY_DATABASE_URL, echo=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine,  class_=AsyncSession)
 Base = declarative_base()
 metadata = MetaData()
 

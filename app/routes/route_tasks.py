@@ -1,11 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, Security
-from fastapi.security import APIKeyHeader, OAuth2PasswordBearer
+import token
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import APIKeyHeader
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 # from todolist import app
 from app.database import database
 from app.schemas import user_task
 from app.services import user_service
-from app.services.task_service import create_task,get_tasks_by_reference_id,get_id_to_delete,get_id_to_update,task_count_of_user
+from app.services.task_service import create_task, get_pending_tasks_count_for_user,get_tasks_by_reference_id,get_id_to_delete,get_id_to_update, perform_task_update
 from app.routes.route_auth import decode_jwt,oauth2_scheme
 
 # from app.services.auth import get_current_user
@@ -37,7 +39,7 @@ async def add_task(
     return new_task
 
 
-@router.get("/tasks/",response_model=user_task.Task)
+@router.get("/tasks/",response_model=list[user_task.Task])
 async def get_task(
     skip:int=0,
     limit:int=10,
@@ -50,23 +52,24 @@ async def get_task(
     tasks_to_get= get_tasks_by_reference_id (db,reference_id,skip,limit)
     return tasks_to_get
 
-@router.get("/task_count/{task_id}", response_model=user_task.TaskStatusCount)
-async def get_task_count(
-    db: Session = Depends(database.get_db),
-    token: str = Depends(oauth2_scheme)
+# @router.get("/task_count/", response_model=user_task.TaskStatusCount)
+# async def get_task_count(
+#     db: Session = Depends(database.get_db),
+#     token: str = Depends(oauth2_scheme)
 
-):
-    user_info = decode_jwt(token)
-    reference_id = user_info["sub"] 
+# ):
+#     user_info = decode_jwt(token)
+#     reference_id = user_info["sub"] 
 
-    task_counts = task_count_of_user(db, reference_id)
-    return user_task.TaskStatusCount(
-        pending_count=task_counts['Pending'],
-        in_progress_count=task_counts['In Progress'],
-        completed_count=task_counts['Completed']
-    )
+#     task_counts = task_count_of_user(db, reference_id)
+#     return user_task.TaskStatusCount(
+#         pending_count=task_counts['Pending'],
+#         in_progress_count=task_counts['In Progress'],
+#         completed_count=task_counts['Completed']
+#     )
+    
    
-@router.put("/tasks/{task_id}", response_model=user_task.Task)
+@router.put("/tasks/{task_id}", response_model=user_task.TaskBase)
 async def update_task(
     task_id: int,
     task: user_task.TaskCreate,
@@ -76,19 +79,19 @@ async def update_task(
     user_info = decode_jwt(token)
     reference_id = user_info["sub"] 
 
-    task_to_update=get_id_to_update(db,reference_id,todolist=task.todolist,status=task.status)
+    task_to_update= get_id_to_update(db,task_id,todolist=task.todolist,status=task.status)
 
     if not task_to_update:
         raise HTTPException(status_code=404, detail="Task not found")
 
     # if not updated_task:
-    #     raise HTTPException(status_code=400, detail="Failed to update task")
+        # raise HTTPException(status_code=400, detail="Failed to update task")
     
-    # if task_to_update.reference_id != reference_id:
-    #     raise HTTPException(status_code=403, detail="Not authorized to update this task")
+    if task_to_update.reference_id != reference_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this task")
     
-    updated_task = update_task(db, task_id, task.todolist, task.status)
-    return updated_task
+    # updated_task = await perform_task_update(db, task_id, task.todolist, task.status)
+    return task_to_update
 
 
 @router.delete("/tasks/{task_id}", response_model=user_task.Task)
@@ -101,7 +104,7 @@ async def delete_task(
     user_info = decode_jwt(token)
     reference_id = user_info["sub"] 
  
-    task_to_delete = get_id_to_delete(db,reference_id,)
+    task_to_delete = get_id_to_delete(db,task_id,)
 
     if not task_to_delete:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -109,8 +112,26 @@ async def delete_task(
     # if task_to_delete.reference_id != reference_id:
     #     raise HTTPException(status_code=403, detail="Not authorized to delete this task")
 
-    deleted_task = delete_task(db,task_id)
-    return deleted_task
+    # deleted_task =  delete_task(db,task_id)
+    return task_to_delete
+
+
+
+
+
+@router.get("/tasks/pending_tasks_count/", response_model=user_task.PendingTaskCount)
+async def get_pending_tasks(
+    db: Session = Depends(database.get_db),
+    token: str = Depends(oauth2_scheme)
+):
+    user_info = decode_jwt(token)
+    reference_id = user_info["sub"]
+
+    # Call the function without passing 'pending_count' as a keyword argument
+    pending_count = get_pending_tasks_count_for_user(db, reference_id)
+
+    # Return the result
+    return {"pending_count": pending_count}
 
 
 

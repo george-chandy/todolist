@@ -1,9 +1,9 @@
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 # Base model for user data
 class UserBase(BaseModel):
-    email:str
+    email:EmailStr
     username: str
 
 # user request

@@ -3,9 +3,9 @@ from enum import Enum
 from datetime import date
 
 class TaskStatus(Enum):
-    PENDING = "Pending"
-    IN_PROGRESS = "In Progress"
-    COMPLETED = "Completed"
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN PROGRESS"
+    COMPLETED = "COMPLETED"
 
 class TaskBase(BaseModel):
     todolist: str
@@ -27,11 +27,21 @@ class Task(TaskBase):
 
     class Config:
         from_attributes = True
-
-class TaskStatusCount(BaseModel):
+        
+        
+class PendingTaskCount(BaseModel):
     pending_count: int
-    in_progress_count: int
-    completed_count: int
-
+    
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+# class TaskStatusCount(BaseModel):
+#     pending_count: int
+#     # in_progress_count: int
+#     # completed_count: int
+
+#     class Config:
+#         from_attributes = True
+
+
+        
