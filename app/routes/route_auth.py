@@ -13,7 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from uuid import uuid4
 from app.schemas import user_schema  # Assuming user schema is defined
-from app.database.database  import SessionLocal # Assuming your DB session is configured
+from app.database.database  import SessionLocal,get_db
+from app.services.user_service import register_user_in_auth0, save_user_to_db # Assuming your DB session is configured
 
 authrouter = APIRouter(
     tags=["auth"],
@@ -92,7 +93,7 @@ def decode_jwt(token: str):
 router = APIRouter()
 
 
-@router.post("/register")
+'''@router.post("/register")
 async def register(user: user_schema.UserCreate):
     # Initialize the Auth0 Database client
     database = Database(AUTH0_DOMAIN, AUTH0_CLIENT_ID)
@@ -166,9 +167,55 @@ async def register(user: user_schema.UserCreate):
         "message": "User registered successfully!"
     }
 
+'''
+# routers/user_router.py
+# from fastapi import APIRouter, Depends
+# from sqlalchemy.ext.asyncio import AsyncSession
+# from app.services.user_service import register_user_in_auth0, save_user_to_db
+# from app.database.database import get_db
+# from app.schemas import user_schema
 
+router = APIRouter()
 
+@router.post("/register")
+async def register(user: user_schema.UserCreate, db: AsyncSession = Depends(get_db)):
+    """
+    Registers a new user by interacting with Auth0 and the local database.
 
+    Args:
+        user (UserCreate): User details from the request body.
+        db (AsyncSession): Database session dependency.
+
+    Returns:
+        dict: Registered user data with a UUID token.
+    """
+    # Step 1: Register user in Auth0
+    database = Database(AUTH0_DOMAIN, AUTH0_CLIENT_ID)
+    new_user = await register_user_in_auth0(
+        database=database,
+        username=user.username,
+        password=user.password,
+        email=user.email
+    )
+
+    # Step 2: Save user in the local database and create schema
+    token = await save_user_to_db(
+        session=db,
+        reference_id=new_user["_id"],
+        username=user.username,
+        email=user.email
+    )
+
+    # Step 3: Return the response
+    return {
+        "user_id": new_user["_id"],
+        "username": user.username,
+        "email": user.email,
+        "token": token,
+        "message": "User registered successfully!"
+    }
+
+''
 
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):

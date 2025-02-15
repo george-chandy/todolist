@@ -20,7 +20,6 @@ class TaskCreate(TaskBase):
 # task response
 class Task(TaskBase):
     task_id: int
-    reference_id: str
     todolist: str
     date: date
     status: str

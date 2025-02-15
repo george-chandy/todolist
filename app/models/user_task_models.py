@@ -16,16 +16,12 @@ class Users(Base):
     name = Column(String, nullable=True)
     
 
-    
-
 class Tasks(Base):
-    __tablename__ = 'tasks'
-    reference_id=Column(String)
-    task_id = Column(Integer, primary_key=True, index=True)
-    date = Column(Date)
-    todolist = Column(String)
-    status = Column(Enum(TaskStatus), default=TaskStatus.PENDING)
-
+    __tablename__ = "tasks"
+    task_id=Column(Integer, primary_key=True, index=True)
+    todolist=Column(String)
+    date=Column(Date)
+    status=Column(Enum(TaskStatus), default=TaskStatus.PENDING)
 
 
     

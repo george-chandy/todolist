@@ -23,8 +23,43 @@ router = APIRouter()
 API_KEY_NAME = "Authorization"
 api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
 
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt
 
-@router.post("/tasks/", response_model=user_task.Task)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import jwt
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, "your_auth0_secret", algorithms=["RS256"])
+        auth0_sub = payload.get("sub")  # Use "email" if preferred
+        if not auth0_sub:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication token",
+            )
+        return auth0_sub
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+        )
+    except jwt.JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+
+
+'''
+
+@router.post("/tasks/", response_model=user_task.TaskCreate)
 async def add_task(
     task: user_task.TaskCreate,
     db: Session = Depends(database.get_db),
@@ -35,8 +70,35 @@ async def add_task(
     reference_id = user_info["sub"]  # Auth0 user_id
     
     # Create the task in the database
-    new_task = create_task(db, reference_id=reference_id, todolist=task.todolist,status=task.status)
+    new_task = create_task(db, todolist=task.todolist,status=task.status)
     return new_task
+'''
+@router.post("/tasks/", response_model=user_task.TaskCreate)
+def create_task(
+    task:user_task.TaskCreate,
+    auth0_sub: str = Depends(get_current_user),  # Extract Auth0 subject (sub)
+    db: Session = Depends(database.get_db)          # Connect to DB
+):
+    # Step 1: Query the `users` table to get the user UUID
+    user = db.execute(
+        "SELECT uuid FROM public.users WHERE auth0_sub = :auth0_sub",
+        {"auth0_sub": auth0_sub}
+    ).fetchone()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_uuid = user.uuid
+
+    # Step 2: Dynamically set the schema using the user's UUID
+    schema_name = f"user_{user_uuid}"  # Construct the schema name
+    db.execute(f'SET search_path TO "{schema_name}"')
+
+    # Step 3: Insert the task into the user's `tasks` table
+    new_task = create_task(db, todolist=task.todolist,status=task.status)
+    return new_task
+
+    return {"message": f"Task created successfully in schema '{schema_name}'"}
 
 
 @router.get("/tasks/",response_model=list[user_task.Task])

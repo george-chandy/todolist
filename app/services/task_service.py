@@ -13,9 +13,9 @@ from sqlalchemy.sql import case
 
 
 
-def create_task(session: Session, reference_id: str, todolist: str, status:str):
+def create_task(session: Session, todolist: str, status:str):
     new_task = Tasks(
-        reference_id=reference_id,  # Auth0 user ID
+          # Auth0 user ID
         date=date.today(),
         todolist=todolist,
         status=status  
